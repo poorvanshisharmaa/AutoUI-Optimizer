@@ -24,11 +24,22 @@ from app.config.settings import get_settings
 _client: AsyncIOMotorClient | None = None
 
 
+def _clean_mongo_url(url: str) -> str:
+    """
+    Fix common corruption that happens when copy-pasting MongoDB URIs
+    into environment variable dashboards (Render, Railway, etc.).
+    - &amp; → &   (HTML entity encoding)
+    - strips accidental whitespace / newlines
+    """
+    return url.strip().replace("&amp;", "&").replace("%26", "&")
+
+
 def get_client() -> AsyncIOMotorClient:
     global _client
     if _client is None:
         settings = get_settings()
-        _client = AsyncIOMotorClient(settings.mongodb_url)
+        url = _clean_mongo_url(settings.mongodb_url)
+        _client = AsyncIOMotorClient(url)
     return _client
 
 
