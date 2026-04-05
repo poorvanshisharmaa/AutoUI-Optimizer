@@ -49,10 +49,16 @@ def get_db() -> AsyncIOMotorDatabase:
 
 
 async def init_db() -> None:
-    """Create indexes on startup."""
-    db = get_db()
-    await db.sessions.create_index("created_at")
-    await db.sessions.create_index([("url", 1), ("created_at", -1)])
+    """Create indexes on startup. Non-fatal — app starts even if Atlas is unreachable."""
+    try:
+        db = get_db()
+        await db.sessions.create_index("created_at")
+        await db.sessions.create_index([("url", 1), ("created_at", -1)])
+        print("[DB] MongoDB connected and indexes ready.")
+    except Exception as e:
+        # Log but don't crash — bad credentials / network won't kill the server
+        print(f"[DB] WARNING: Could not connect to MongoDB at startup: {e}")
+        print("[DB] Fix MONGODB_URL in Render env vars, then redeploy.")
 
 
 async def close_db() -> None:
