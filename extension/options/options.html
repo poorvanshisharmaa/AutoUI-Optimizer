@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AutoUI Optimizer — Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #e2e8f0;
+      padding: 40px;
+      max-width: 560px;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 32px;
+    }
+    .logo-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 20px;
+    }
+    .logo h1 { font-size: 20px; font-weight: 800; }
+    .logo span { font-size: 12px; color: #94a3b8; display: block; }
+    .section { margin-bottom: 28px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .hint { font-size: 11px; color: #94a3b8; margin-bottom: 8px; line-height: 1.5; }
+    input[type="text"] {
+      width: 100%; padding: 10px 14px; border-radius: 8px;
+      background: #1a1a2e; border: 1px solid #2d2d44;
+      color: #e2e8f0; font-size: 14px; outline: none;
+    }
+    input[type="text"]:focus { border-color: #6366f1; }
+    .row { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
+    button {
+      padding: 9px 22px; border-radius: 7px; border: none;
+      background: #6366f1; color: white; font-size: 13px;
+      font-weight: 600; cursor: pointer;
+    }
+    button:hover { opacity: 0.85; }
+    #status {
+      font-size: 13px; padding: 8px 14px; border-radius: 6px;
+      display: none;
+    }
+    #status.ok { background: #0a2a1a; color: #22c55e; border: 1px solid #22c55e44; display: block; }
+    #status.err { background: #1a0a0a; color: #ef4444; border: 1px solid #ef444444; display: block; }
+    .divider { border: none; border-top: 1px solid #2d2d44; margin: 24px 0; }
+    .free-note {
+      background: #1a1a2e; border: 1px solid #2d2d44; border-radius: 8px;
+      padding: 14px 16px; font-size: 12px; line-height: 1.7; color: #94a3b8;
+    }
+    .free-note strong { color: #a5b4fc; }
+    a { color: #6366f1; }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <div class="logo-icon">A</div>
+    <div>
+      <h1>AutoUI Optimizer</h1>
+      <span>Settings</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <label for="api-url">Backend API URL</label>
+    <div class="hint">
+      Your Render.com deployment URL. Leave default if using the public hosted version.
+    </div>
+    <input type="text" id="api-url" placeholder="https://autoui-optimizer.onrender.com" />
+  </div>
+
+  <div class="section">
+    <label for="user-token">API Token (optional)</label>
+    <div class="hint">
+      Leave blank for anonymous usage. Sign in to the dashboard to get a token.
+    </div>
+    <input type="text" id="user-token" placeholder="aut_xxxxxxxxxxxx" />
+  </div>
+
+  <div class="row">
+    <button id="btn-save">Save Settings</button>
+    <button id="btn-test" style="background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0">
+      Test Connection
+    </button>
+    <div id="status"></div>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="free-note">
+    <strong>Free hosting setup:</strong><br>
+    1. Deploy backend to <a href="https://render.com" target="_blank">Render.com</a> (free tier)<br>
+    2. Set up database on <a href="https://supabase.com" target="_blank">Supabase.com</a> (free tier)<br>
+    3. Get AI key from <a href="https://console.groq.com" target="_blank">console.groq.com</a> (free)<br>
+    4. Paste your Render URL above and save.
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
