@@ -3,7 +3,7 @@
 
 const AUTOUI_CONFIG = {
   // Your Render.com backend URL (set after deploying backend)
-  DEFAULT_API: "https://autoui-optimizer.onrender.com",
+  DEFAULT_API: "https://autoui-optimizer-1.onrender.com",
 
   // Your Vercel dashboard URL (set after deploying frontend)
   DASHBOARD_URL: "https://autoui-optimizer.vercel.app",
