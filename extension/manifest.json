@@ -19,7 +19,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["contentScript.js"],
+      "js": ["config.js", "contentScript.js"],
       "run_at": "document_idle",
       "exclude_matches": ["chrome://*/*", "chrome-extension://*/*"]
     }

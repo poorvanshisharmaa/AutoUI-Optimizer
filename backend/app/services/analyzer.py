@@ -1,15 +1,13 @@
 """
-Core analyzer: orchestrates rule engine + AI, stores results, calculates score.
+Core analyzer: orchestrates rule engine + AI, stores result as a single MongoDB document.
 """
 
 from datetime import datetime, timezone
 from app.models.schemas import PerformanceUpload, AnalysisResult, Suggestion
-from app.models.database import AsyncSession, Session as DBSession, Metric, Component
-from app.models.database import Suggestion as DBSuggestion
+from app.models.database import get_db
 from app.services.rule_engine import run_rules
 from app.services.groq_service import get_ai_suggestions
 from app.services.cache import cache_get, cache_set
-import uuid
 
 
 def compute_score(metrics) -> int:
@@ -26,50 +24,18 @@ def compute_score(metrics) -> int:
     return round(score * 100)
 
 
-async def store_session(db: AsyncSession, data: PerformanceUpload, score: int) -> None:
-    # Upsert session
-    session = DBSession(id=data.sessionId, url=data.url, score=score)
-    await db.merge(session)
-
-    # Metric row
-    m = data.metrics
-    metric = Metric(
-        id=str(uuid.uuid4()),
-        session_id=data.sessionId,
-        lcp=m.LCP, cls=m.CLS, inp=m.INP,
-        ttfb=m.TTFB, load_time=m.loadTime,
-        dom_interactive=m.domInteractive,
-    )
-    db.add(metric)
-
-    # Component rows
-    for comp in data.components:
-        db.add(Component(
-            id=str(uuid.uuid4()),
-            session_id=data.sessionId,
-            name=comp.name,
-            render_time=comp.renderTime,
-            re_renders=comp.reRenders,
-        ))
-
-    await db.commit()
+def _suggestion_to_dict(s: Suggestion) -> dict:
+    return {
+        "id": s.id,
+        "issue": s.issue,
+        "fix": s.fix,
+        "category": s.category,
+        "impact_score": s.impact_score,
+        "code_snippet": s.code_snippet,
+    }
 
 
-async def store_suggestions(db: AsyncSession, session_id: str, suggestions: list[Suggestion]) -> None:
-    for s in suggestions:
-        db.add(DBSuggestion(
-            id=s.id,
-            session_id=session_id,
-            issue=s.issue,
-            fix=s.fix,
-            category=s.category,
-            impact_score=s.impact_score,
-            code_snippet=s.code_snippet,
-        ))
-    await db.commit()
-
-
-async def analyze_session(data: PerformanceUpload, db: AsyncSession) -> AnalysisResult:
+async def analyze_session(data: PerformanceUpload) -> AnalysisResult:
     cache_key = f"analysis:{data.sessionId}"
     cached = await cache_get(cache_key)
     if cached:
@@ -81,33 +47,59 @@ async def analyze_session(data: PerformanceUpload, db: AsyncSession) -> Analysis
     rule_suggestions = run_rules(data)
     rule_issues = [s.issue for s in rule_suggestions]
 
-    # 2. AI suggestions (async, Groq Llama 3)
+    # 2. AI suggestions via Groq + Llama 3
     ai_suggestions = await get_ai_suggestions(data, rule_issues)
 
-    # Merge: rules first, then AI (deduplicated by category limit)
+    # Merge — cap at 3 per category, 10 total
     all_suggestions = rule_suggestions + ai_suggestions
-    seen_categories: dict[str, int] = {}
-    deduped = []
+    seen: dict[str, int] = {}
+    deduped: list[Suggestion] = []
     for s in all_suggestions:
-        count = seen_categories.get(s.category, 0)
-        if count < 3:  # max 3 per category
+        if seen.get(s.category, 0) < 3:
             deduped.append(s)
-            seen_categories[s.category] = count + 1
+            seen[s.category] = seen.get(s.category, 0) + 1
+    deduped = deduped[:10]
+
+    # 3. Upsert single document into MongoDB (one doc = one session, everything embedded)
+    db = get_db()
+    doc = {
+        "_id": data.sessionId,
+        "url": data.url,
+        "score": score,
+        "created_at": datetime.now(timezone.utc),
+        "metrics": data.metrics.model_dump(exclude_none=True),
+        "components": [c.model_dump() for c in data.components],
+        "resources": [r.model_dump() for r in data.resources],
+        "suggestions": [_suggestion_to_dict(s) for s in deduped],
+    }
+    try:
+        await db.sessions.replace_one({"_id": data.sessionId}, doc, upsert=True)
+    except Exception as e:
+        print(f"[MongoDB] Write error: {e}")
 
     result = AnalysisResult(
         sessionId=data.sessionId,
         score=score,
-        suggestions=deduped[:10],
+        suggestions=deduped,
         analyzed_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    # Persist
-    try:
-        await store_session(db, data, score)
-        await store_suggestions(db, data.sessionId, deduped[:10])
-    except Exception as e:
-        print(f"[DB] Store error: {e}")
-
-    # Cache result
     await cache_set(cache_key, result.model_dump())
     return result
+
+
+async def get_session_document(session_id: str) -> dict | None:
+    """Fetch the full session document from MongoDB."""
+    db = get_db()
+    doc = await db.sessions.find_one({"_id": session_id})
+    return doc
+
+
+async def get_recent_sessions(limit: int = 20) -> list[dict]:
+    """Fetch most recent sessions for the dashboard overview."""
+    db = get_db()
+    cursor = db.sessions.find(
+        {},
+        {"_id": 1, "url": 1, "score": 1, "created_at": 1}
+    ).sort("created_at", -1).limit(limit)
+    return await cursor.to_list(length=limit)

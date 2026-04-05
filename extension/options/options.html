@@ -7,14 +7,9 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f0f1a;
-      color: #e2e8f0;
-      padding: 40px;
-      max-width: 560px;
+      background: #0f0f1a; color: #e2e8f0; padding: 40px; max-width: 560px;
     }
-    .logo {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 32px;
-    }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
     .logo-icon {
       width: 40px; height: 40px; border-radius: 10px;
       background: linear-gradient(135deg, #6366f1, #8b5cf6);
@@ -23,7 +18,7 @@
     }
     .logo h1 { font-size: 20px; font-weight: 800; }
     .logo span { font-size: 12px; color: #94a3b8; display: block; }
-    .section { margin-bottom: 28px; }
+    .section { margin-bottom: 22px; }
     label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
     .hint { font-size: 11px; color: #94a3b8; margin-bottom: 8px; line-height: 1.5; }
     input[type="text"] {
@@ -32,26 +27,27 @@
       color: #e2e8f0; font-size: 14px; outline: none;
     }
     input[type="text"]:focus { border-color: #6366f1; }
-    .row { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
+    .row { display: flex; gap: 10px; margin-top: 20px; align-items: center; flex-wrap: wrap; }
     button {
-      padding: 9px 22px; border-radius: 7px; border: none;
-      background: #6366f1; color: white; font-size: 13px;
-      font-weight: 600; cursor: pointer;
+      padding: 9px 20px; border-radius: 7px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
     }
+    .btn-primary  { background: #6366f1; color: white; }
+    .btn-secondary { background: #1a1a2e; color: #e2e8f0; border: 1px solid #2d2d44; }
     button:hover { opacity: 0.85; }
     #status {
-      font-size: 13px; padding: 8px 14px; border-radius: 6px;
-      display: none;
+      font-size: 13px; padding: 6px 12px; border-radius: 6px; display: none;
     }
-    #status.ok { background: #0a2a1a; color: #22c55e; border: 1px solid #22c55e44; display: block; }
+    #status.ok  { background: #0a2a1a; color: #22c55e; border: 1px solid #22c55e44; display: block; }
     #status.err { background: #1a0a0a; color: #ef4444; border: 1px solid #ef444444; display: block; }
     .divider { border: none; border-top: 1px solid #2d2d44; margin: 24px 0; }
     .free-note {
       background: #1a1a2e; border: 1px solid #2d2d44; border-radius: 8px;
-      padding: 14px 16px; font-size: 12px; line-height: 1.7; color: #94a3b8;
+      padding: 14px 16px; font-size: 12px; line-height: 1.8; color: #94a3b8;
     }
     .free-note strong { color: #a5b4fc; }
     a { color: #6366f1; }
+    .version { font-size: 11px; color: #4c4c7a; margin-top: 24px; }
   </style>
 </head>
 <body>
@@ -59,44 +55,49 @@
     <div class="logo-icon">A</div>
     <div>
       <h1>AutoUI Optimizer</h1>
-      <span>Settings</span>
+      <span>Extension Settings</span>
     </div>
   </div>
 
   <div class="section">
     <label for="api-url">Backend API URL</label>
-    <div class="hint">
-      Your Render.com deployment URL. Leave default if using the public hosted version.
-    </div>
+    <div class="hint">Your Render.com deployment URL. This is where performance data is sent.</div>
     <input type="text" id="api-url" placeholder="https://autoui-optimizer.onrender.com" />
   </div>
 
   <div class="section">
-    <label for="user-token">API Token (optional)</label>
-    <div class="hint">
-      Leave blank for anonymous usage. Sign in to the dashboard to get a token.
-    </div>
-    <input type="text" id="user-token" placeholder="aut_xxxxxxxxxxxx" />
+    <label for="dashboard-url">Dashboard URL</label>
+    <div class="hint">Your Vercel dashboard URL. Opens when you click "Open Dashboard" in the popup.</div>
+    <input type="text" id="dashboard-url" placeholder="https://autoui-optimizer.vercel.app" />
+  </div>
+
+  <div class="section">
+    <label for="user-token">API Token <span style="color:#4c4c7a;font-weight:400">(optional)</span></label>
+    <div class="hint">Leave blank for anonymous usage. Reserved for future auth support.</div>
+    <input type="text" id="user-token" placeholder="Leave blank for now" />
   </div>
 
   <div class="row">
-    <button id="btn-save">Save Settings</button>
-    <button id="btn-test" style="background:#1a1a2e;border:1px solid #2d2d44;color:#e2e8f0">
-      Test Connection
-    </button>
+    <button class="btn-primary"   id="btn-save">Save Settings</button>
+    <button class="btn-secondary" id="btn-test">Test Connection</button>
+    <button class="btn-secondary" id="btn-reset">Reset Defaults</button>
     <div id="status"></div>
   </div>
 
   <hr class="divider" />
 
   <div class="free-note">
-    <strong>Free hosting setup:</strong><br>
-    1. Deploy backend to <a href="https://render.com" target="_blank">Render.com</a> (free tier)<br>
-    2. Set up database on <a href="https://supabase.com" target="_blank">Supabase.com</a> (free tier)<br>
-    3. Get AI key from <a href="https://console.groq.com" target="_blank">console.groq.com</a> (free)<br>
-    4. Paste your Render URL above and save.
+    <strong>Free hosting setup guide:</strong><br>
+    1. Deploy backend → <a href="https://render.com" target="_blank">Render.com</a> (free tier)<br>
+    2. Database → <a href="https://mongodb.com/atlas" target="_blank">MongoDB Atlas M0</a> (free, 512MB)<br>
+    3. AI → <a href="https://console.groq.com" target="_blank">Groq API key</a> (free, Llama 3-70B)<br>
+    4. Dashboard → <a href="https://vercel.com" target="_blank">Vercel</a> (free)<br>
+    5. Paste your URLs above and click Save.
   </div>
 
+  <p class="version">AutoUI Optimizer v1.0.0</p>
+
+  <script src="../config.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

@@ -1,89 +1,51 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import Column, String, Float, Integer, DateTime, Text, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
-import uuid
-from datetime import datetime, timezone
+"""
+MongoDB connection using Motor (async driver).
+Each session is stored as a single document — no joins needed.
+
+Document shape in `sessions` collection:
+{
+  "_id": "session-uuid",
+  "url": "https://...",
+  "score": 72,
+  "created_at": ISODate,
+  "metrics": { "LCP": 3.1, "CLS": 0.05, "INP": 210, ... },
+  "components": [ { "name": "Dashboard", "renderTime": 120, "reRenders": 5 }, ... ],
+  "resources":  [ { "name": "bundle.js", "type": "script", "duration": 800, ... }, ... ],
+  "suggestions": [
+    { "id": "...", "issue": "...", "fix": "...", "category": "render", "impact_score": 0.4, "code_snippet": "..." },
+    ...
+  ]
+}
+"""
+
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from app.config.settings import get_settings
 
-
-class Base(DeclarativeBase):
-    pass
+_client: AsyncIOMotorClient | None = None
 
 
-class Session(Base):
-    __tablename__ = "sessions"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    url = Column(Text)
-    score = Column(Integer, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
-
-class Metric(Base):
-    __tablename__ = "metrics"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    session_id = Column(String, ForeignKey("sessions.id"))
-    lcp = Column(Float, nullable=True)
-    cls = Column(Float, nullable=True)
-    inp = Column(Integer, nullable=True)
-    ttfb = Column(Float, nullable=True)
-    load_time = Column(Float, nullable=True)
-    dom_interactive = Column(Float, nullable=True)
-
-
-class Component(Base):
-    __tablename__ = "components"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    session_id = Column(String, ForeignKey("sessions.id"))
-    name = Column(String)
-    render_time = Column(Float)
-    re_renders = Column(Integer)
-
-
-class Suggestion(Base):
-    __tablename__ = "suggestions"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    session_id = Column(String, ForeignKey("sessions.id"))
-    issue = Column(Text)
-    fix = Column(Text)
-    category = Column(String)
-    impact_score = Column(Float)
-    code_snippet = Column(Text, nullable=True)
-
-
-# ── Engine & Session factory ──────────────────────────────────────────────────
-
-_engine = None
-_session_factory = None
-
-
-def get_engine():
-    global _engine
-    if _engine is None:
+def get_client() -> AsyncIOMotorClient:
+    global _client
+    if _client is None:
         settings = get_settings()
-        _engine = create_async_engine(
-            settings.database_url,
-            echo=False,
-            pool_size=5,
-            max_overflow=10,
-        )
-    return _engine
+        _client = AsyncIOMotorClient(settings.mongodb_url)
+    return _client
 
 
-def get_session_factory():
-    global _session_factory
-    if _session_factory is None:
-        _session_factory = async_sessionmaker(get_engine(), expire_on_commit=False)
-    return _session_factory
+def get_db() -> AsyncIOMotorDatabase:
+    settings = get_settings()
+    return get_client()[settings.mongodb_db_name]
 
 
-async def get_db():
-    factory = get_session_factory()
-    async with factory() as session:
-        yield session
+async def init_db() -> None:
+    """Create indexes on startup."""
+    db = get_db()
+    await db.sessions.create_index("created_at")
+    await db.sessions.create_index([("url", 1), ("created_at", -1)])
 
 
-async def init_db():
-    engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def close_db() -> None:
+    global _client
+    if _client:
+        _client.close()
+        _client = None

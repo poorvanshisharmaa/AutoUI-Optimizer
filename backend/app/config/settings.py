@@ -4,7 +4,8 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     groq_api_key: str = ""
-    database_url: str = ""
+    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_db_name: str = "autoui"
     redis_url: str = ""
     secret_key: str = "dev-secret-key-change-in-prod"
     environment: str = "development"

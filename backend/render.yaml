@@ -9,8 +9,10 @@ services:
     envVars:
       - key: GROQ_API_KEY
         sync: false
-      - key: DATABASE_URL
+      - key: MONGODB_URL
         sync: false
+      - key: MONGODB_DB_NAME
+        value: autoui
       - key: REDIS_URL
         sync: false
       - key: SECRET_KEY

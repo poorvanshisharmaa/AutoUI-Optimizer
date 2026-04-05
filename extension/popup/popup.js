@@ -1,3 +1,5 @@
+// popup.js — depends on config.js being loaded first via popup.html
+
 const app = document.getElementById("app");
 
 function rateMetric(name, value) {
@@ -8,7 +10,7 @@ function rateMetric(name, value) {
     TTFB: { good: 0.8,  poor: 1.8 },
   };
   const t = thresholds[name];
-  if (!t || value === undefined) return "good";
+  if (!t || value === undefined || value === null) return "good";
   if (value <= t.good) return "good";
   if (value <= t.poor) return "needs-improvement";
   return "poor";
@@ -35,7 +37,7 @@ function calcScore(metrics) {
   return Math.round(score * 100);
 }
 
-function renderMetrics(metrics, suggestions) {
+function renderMetrics(metrics, suggestions, sessionId) {
   const score = calcScore(metrics);
   const scoreColor = score >= 80 ? "good" : score >= 50 ? "needs-improvement" : "poor";
 
@@ -80,37 +82,43 @@ function renderMetrics(metrics, suggestions) {
     <div class="footer">
       <button class="btn btn-primary" id="btn-analyze">Analyze with AI</button>
       <button class="btn btn-secondary" id="btn-dashboard">Open Dashboard</button>
+      <button class="btn btn-settings" id="btn-settings">Settings</button>
     </div>
+    ${sessionId ? `<div class="session-id">Session: ${sessionId}</div>` : ""}
   `;
 
-  document.getElementById("btn-analyze").addEventListener("click", triggerAnalysis);
-  document.getElementById("btn-dashboard").addEventListener("click", () => {
-    chrome.tabs.create({ url: "https://autoui-optimizer.vercel.app" });
+  document.getElementById("btn-analyze").addEventListener("click", () => triggerAnalysis(sessionId));
+  document.getElementById("btn-dashboard").addEventListener("click", openDashboard);
+  document.getElementById("btn-settings").addEventListener("click", () => {
+    chrome.runtime.openOptionsPage();
   });
 }
 
-async function triggerAnalysis() {
+async function openDashboard() {
+  const { dashboardUrl } = await chrome.storage.local.get("dashboardUrl");
+  chrome.tabs.create({ url: dashboardUrl || AUTOUI_CONFIG.DASHBOARD_URL });
+}
+
+async function triggerAnalysis(sessionId) {
   const btn = document.getElementById("btn-analyze");
   btn.textContent = "Analyzing...";
   btn.disabled = true;
 
-  const { latestSession } = await chrome.storage.local.get("latestSession");
-  if (!latestSession?.sessionId) {
-    btn.textContent = "No session found";
+  if (!sessionId) {
+    btn.textContent = "No session yet";
+    btn.disabled = false;
     return;
   }
 
   chrome.runtime.sendMessage(
-    { type: "TRIGGER_ANALYZE", sessionId: latestSession.sessionId },
+    { type: "TRIGGER_ANALYZE", sessionId },
     (response) => {
       if (response?.success) {
-        btn.textContent = "View in Dashboard";
+        btn.textContent = "Done — Open Dashboard";
         btn.disabled = false;
-        btn.addEventListener("click", () => {
-          chrome.tabs.create({ url: "https://autoui-optimizer.vercel.app" });
-        });
+        btn.addEventListener("click", openDashboard, { once: true });
       } else {
-        btn.textContent = "Analysis failed";
+        btn.textContent = "Retry Analysis";
         btn.disabled = false;
       }
     }
@@ -120,32 +128,39 @@ async function triggerAnalysis() {
 async function init() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
-    app.innerHTML = '<div class="loading">No active tab found.</div>';
+    app.innerHTML = '<div class="loading">No active tab.</div>';
     return;
   }
 
-  // Get session ID from content script
   chrome.tabs.sendMessage(tab.id, { type: "GET_METRICS" }, async (response) => {
     if (chrome.runtime.lastError || !response) {
-      app.innerHTML = '<div class="loading"><div class="spinner"></div>Waiting for page metrics...</div>';
+      app.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          Waiting for page data...<br>
+          <small style="margin-top:8px;display:block;color:#4c4c7a">Try refreshing the page</small>
+        </div>`;
       return;
     }
 
     const { metrics } = response;
     const { latestSession } = await chrome.storage.local.get("latestSession");
+    const sessionId = latestSession?.sessionId;
 
     let suggestions = [];
-    if (latestSession?.sessionId) {
+    if (sessionId) {
       try {
         const { apiBase } = await chrome.storage.local.get("apiBase");
-        const base = (apiBase || "https://autoui-optimizer.onrender.com").replace(/\/$/, "");
-        const res = await fetch(`${base}/api/v1/suggestions/${latestSession.sessionId}`);
-        const data = await res.json();
-        suggestions = data.suggestions || [];
+        const base = (apiBase || AUTOUI_CONFIG.DEFAULT_API).replace(/\/$/, "");
+        const res = await fetch(`${base}/api/v1/suggestions/${sessionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          suggestions = data.suggestions || [];
+        }
       } catch (_) {}
     }
 
-    renderMetrics(metrics.metrics || {}, suggestions);
+    renderMetrics(metrics.metrics || {}, suggestions, sessionId);
   });
 }
 
