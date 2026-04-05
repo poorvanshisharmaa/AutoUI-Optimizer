@@ -22,3 +22,5 @@ services:
         value: production
       - key: ALLOWED_ORIGINS
         value: https://autoui-optimizer.vercel.app
+      - key: PYTHON_VERSION
+        value: 3.11.9
