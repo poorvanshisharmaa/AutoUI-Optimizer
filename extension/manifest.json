@@ -21,7 +21,7 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": ["config.js", "contentScript.js"],
       "run_at": "document_idle",
-      "exclude_matches": ["chrome://*/*", "chrome-extension://*/*"]
+      "exclude_matches": [""]
     }
   ],
 
